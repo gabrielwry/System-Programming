@@ -180,7 +180,7 @@
  			Start from iteration = 1, at bit map is int 3,
  			only test till the half of j, in terms of number of odd, is j/4,
  		*/
- 		printf("wtf?? %d\n",iteration*2+1);
+ 		//printf("wtf?? %d\n",iteration*2+1);
  		if(!(seg_i->bits[int_i] & 1<<bit_i) & !(seg_k->bits[int_k] & 1<<bit_k) ){//if both are prime
  			
  			count++;
