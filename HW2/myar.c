@@ -7,6 +7,7 @@
 #include <fcntl.h>
 #include <string.h>
 #include <time.h>
+#include <utime.h>
 #include <errno.h>
 #include <string.h>
 
@@ -30,13 +31,17 @@ void print_mode(int mode);
 void print_time(time_t timestamp);
 int is_archive(int fildes); // check if file is archive file
 int write_data(int in_fildes,int out_fildes,hdr* file_hdr);
+int find_header(int fildes, char* filename); 
+int extract(int in_fildes, int out_fildes, int offset);
 int t_method(int fildes);
 int v_method(int fildes);
 int q_method(char* filename, char* aname);
+int x_method(int fildes, char* filename, char* aname);
 hdr* read_header(int fildes);
 hdr* write_header(int out_fildes,char* filename);
 
-hdr* read_header(int fildes){
+
+hdr* read_header(int fildes){ // read next header, no lseek size
 	hdr* file_hdr;
 	char buf_header[60];
 	int bits;
@@ -187,6 +192,32 @@ hdr* write_header(int out_fildes, char* filename)
     return file_hdr;
 
 }
+int find_header(int fildes, char* filename)
+{
+	int offset;
+	int file_size;
+	hdr* file_hdr;
+	file_hdr = read_header(fildes);
+
+	while(file_hdr->bits == 60){
+		//printf("Identifier is %s, filename is %s\n.",file_hdr->identifier,filename);
+		if(strcmp(file_hdr->identifier,filename)==0){
+    		offset =lseek(fildes, -60, SEEK_CUR);
+    		return offset; //file found return position offset
+    	}
+		
+    	if (file_hdr->size%2){
+        	file_hdr->size += 1;
+    	}
+    	lseek(fildes, file_hdr->size, SEEK_CUR);
+    	file_hdr = read_header(fildes);
+    	if(strcmp(file_hdr->identifier,"\n")==0){
+    		break;
+    	} 	
+	}
+	return -1; //file not found
+	
+}
 int write_data(int in_fildes, int out_fildes, hdr* file_hdr)
 {
 	char buf[1];
@@ -201,6 +232,51 @@ int write_data(int in_fildes, int out_fildes, hdr* file_hdr)
     }
     close(out_fildes);
     close(in_fildes);
+    return 1;
+}
+int extract(int in_fildes, int out_fildes, int offset)
+{
+	struct utimbuf file_time;
+	hdr* file_hdr;
+    int counter = 0;
+    int* buf_size; 
+    int* buf_header;
+    char buf[1];
+    char* filename;
+    int mode;
+    time_t timestamp;
+
+    if (offset == -1) {
+        return -1;
+    }
+
+    buf_header = malloc(sizeof(61));
+    buf_size = malloc(sizeof(file_hdr->size));// reserve buffer for header of file
+
+    lseek(in_fildes, offset, SEEK_SET); // move pointer to file data
+    file_hdr = read_header(in_fildes);
+    mode = file_hdr->mode;
+    timestamp = file_hdr->timestamp;
+    file_time.actime = timestamp; 
+    file_time.modtime = timestamp;
+    filename = file_hdr->identifier;
+
+    //Extract to new file
+    while (counter < file_hdr->size) {
+        read(in_fildes, buf, 1);
+        write(out_fildes,buf,1);
+        counter+=1;
+    }
+
+    fchmod(out_fildes, mode);
+    utime(filename, &file_time);
+
+    //Clean up
+    close(out_fildes);
+    close(in_fildes);
+    free(buf_size);
+    free(buf_header);
+
     return 1;
 }
 void print_mode(int mode)
@@ -249,9 +325,6 @@ int t_method(int fildes)
 {	
 	hdr* file_hdr;
 	int file_size;
-	int counter = 0;
-	char filename[16];
-	char buf[60];
 
 	file_hdr = read_header(fildes);
 	while(file_hdr->bits == 60){
@@ -320,9 +393,23 @@ int q_method(char* archive_name, char* file_name)
     return 1;
 }
 
-int x_method(char* aname, char* name)
+int x_method(int in_fildes, char* archive_name, char* file_name)
 {
-	printf("x_method is called with file name %s\n",name);
+    int out_fildes;
+    int offset;
+    hdr* header;
+
+    offset = find_header(in_fildes,file_name); //head now should point to the match header
+
+    if(offset==-1){
+    	printf("Error extracting file %s.",file_name);
+    	exit(0);
+    	return -1;
+    }
+    out_fildes = open(file_name, O_WRONLY | O_TRUNC | O_CREAT, 0666);
+    extract(in_fildes,out_fildes,offset);
+	
+    return 1;
 }
 
 
@@ -342,14 +429,14 @@ int main(int argc, char **argv)
 {
 	char* name;
 	int key;
-	int errono; //return value from is_archive
+	int exist; //return value from is_archive
 	int out_fildes;//use to create file
 
 	char *aname = argv[2];
 	int fildes = open(aname, O_RDONLY);
 
 
-	errono = is_archive(fildes);
+	exist = is_archive(fildes);
 	if(argc == 4){
 	  name = argv[3];
 	}
@@ -365,7 +452,7 @@ int main(int argc, char **argv)
     while ((key = getopt(argc, argv, "qxtvdA")) != -1){ //checking EOF
     	switch (key) {
             case 'q':
-            	if (errono == 0){
+            	if (exist == 0){
             		/*Archive file doesn't exist, create one*/
             		out_fildes = open(aname, O_WRONLY | O_CREAT, 0666);
         			write(out_fildes, "!<arch>\n", 8);
@@ -374,7 +461,11 @@ int main(int argc, char **argv)
                 q_method(aname,name); 
                 break;
             case 'x':
-            	x_method(aname,name); 
+            	if (exist ==0){
+            		fprintf(stderr, "Archive %s doesn't exist\n",aname);
+            	}
+            	//find_header(fildes,name);
+            	x_method(fildes,aname,name);
             	break;
             case 't':
                 t_method(fildes); 
