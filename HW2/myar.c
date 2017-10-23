@@ -6,10 +6,11 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <string.h>
+#include <time.h>
 
 typedef struct _hdr { // ar header data structure to store file infomration
 	char identifier[16]; // length 16 identifier
-	int timestamp; //
+	time_t timestamp; // timestamp
 	int uid; // owner id
 	int gid;// group id
 	int mode; // file mode
@@ -20,61 +21,12 @@ typedef struct _hdr { // ar header data structure to store file infomration
 hdr* ar_hdr;
 char *ar_identifier = {"!<arch>"};
 
-void output_mode(int st_mode);
+void print_mode(int mode);
+void print_time(time_t timestamp);
 int is_archive(char* identifier); // check if file is archive file
-int print_file(int fildes);
-int parse_filesize(hdr* header);
 int t_method(int fildes);
 int v_method(int fildes);
 hdr* read_header(int fildes);
-
-void output_mode(int st_mode)
-{
-    if (st_mode & S_IRUSR)
-        putchar('r');
-    else
-        putchar('-');
-
-    if (st_mode & S_IWUSR)
-        putchar('w');
-    else
-        putchar('-');
-
-    if (st_mode & S_IXUSR)
-        putchar('x');
-    else
-        putchar('-');
-
-    if (st_mode & S_IRGRP)
-        putchar('r');
-    else
-        putchar('-');
-
-    if (st_mode & S_IWGRP)
-        putchar('w');
-    else
-        putchar('-');
-
-    if (st_mode & S_IXGRP)
-        putchar('x');
-    else
-        putchar('-');
-
-    if (st_mode & S_IROTH)
-        putchar('r');
-    else
-        putchar('-');
-
-    if (st_mode & S_IWOTH)
-        putchar('w');
-    else
-        putchar('-');
-
-    if (st_mode & S_IXOTH)
-        putchar('x');
-    else
-        putchar('-');
-}
 
 hdr* read_header(int fildes){
 	hdr* file_hdr;
@@ -82,7 +34,7 @@ hdr* read_header(int fildes){
 	int bits;
 	int size;
 	int mode;
-	int timestamp;
+	time_t timestamp;
 	int uid;
 	int gid;
 	char buf_size[10]; // at most 10 bits for size
@@ -164,7 +116,30 @@ hdr* read_header(int fildes){
 	return file_hdr;
 
 }
+void print_mode(int mode)
+{
+	printf( (S_ISDIR(mode)) ? "d" : "-");
+    printf( (mode & S_IRUSR) ? "r" : "-");
+    printf( (mode & S_IWUSR) ? "w" : "-");
+    printf( (mode & S_IXUSR) ? "x" : "-");
+    printf( (mode & S_IRGRP) ? "r" : "-");
+    printf( (mode & S_IWGRP) ? "w" : "-");
+    printf( (mode & S_IXGRP) ? "x" : "-");
+    printf( (mode & S_IROTH) ? "r" : "-");
+    printf( (mode & S_IWOTH) ? "w" : "-");
+    printf( (mode & S_IXOTH) ? "x" : "-");
+}
+void print_time(time_t timestamp)
+{	
+	
+	struct tm timestruct;
+    char months[12][4] = {"Jan\0", "Feb\0", "Mar\0", "Apr\0", "May\0", "Jun\0",
+                          "Jul\0", "Aug\0", "Sep\0", "Oct\0", "Nov\0", "Dec\0"};
+    timestruct = *localtime(&timestamp);
+    printf("%s %d %02d:%02d %d", months[timestruct.tm_mon], timestruct.tm_mday, timestruct.tm_hour,
+                             timestruct.tm_min, timestruct.tm_year+1900);
 
+}
 int is_archive(char* identifier)
 {
 	char arch_magic[8];
@@ -203,14 +178,14 @@ int t_method(int fildes)
 	
 }
 
+
 int v_method(int fildes)
 {	
 	hdr* file_hdr;
 	int file_mode;
     int file_size;
     time_t timestamp;
-    char months[12][4] = {"Jan\0", "Feb\0", "Mar\0", "Apr\0", "May\0", "Jun\0",
-                          "Jul\0", "Aug\0", "Sep\0", "Oct\0", "Nov\0", "Dec\0"};
+    
 
     file_hdr = read_header(fildes);
     while(file_hdr->bits == 60){
@@ -222,15 +197,18 @@ int v_method(int fildes)
     	if(strcmp(file_hdr->identifier,"\n")==0){
     		break;
     	}
-
-    	output_mode(file_hdr->mode);
+    	print_mode(file_hdr->mode);
     	putchar(' ');
-    	printf("%d,%d", file_hdr->uid, file_hdr->gid);
+    	printf("%d/%d", file_hdr->uid, file_hdr->gid);
     	putchar(' ');
     	printf("%6d", file_hdr->size);
     	putchar(' ');
-    	printf("%s\n",file_hdr->identifier);
 
+    	/* Print time stamp */
+    	timestamp = file_hdr->timestamp;
+    	print_time(timestamp);
+    	putchar(' ');
+    	printf("%s\n",file_hdr->identifier);
     	file_hdr = read_header(fildes);
 	}
 	return 1;
