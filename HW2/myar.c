@@ -7,6 +7,10 @@
 #include <fcntl.h>
 #include <string.h>
 #include <time.h>
+#include <errno.h>
+#include <string.h>
+
+extern int errno ;
 
 typedef struct _hdr { // ar header data structure to store file infomration
 	char identifier[16]; // length 16 identifier
@@ -18,15 +22,19 @@ typedef struct _hdr { // ar header data structure to store file infomration
 	int bits;// actual bits read by read()
 	}hdr;
 
-hdr* ar_hdr;
 char *ar_identifier = {"!<arch>"};
+char ar_end_char[3] = {0x60, 0x0A, 0x00};
+char new_line[2] = {0x0A,0x00};
 
 void print_mode(int mode);
 void print_time(time_t timestamp);
-int is_archive(char* identifier); // check if file is archive file
+int is_archive(int fildes); // check if file is archive file
+int write_data(int in_fildes,int out_fildes,hdr* file_hdr);
 int t_method(int fildes);
 int v_method(int fildes);
+int q_method(char* filename, char* aname);
 hdr* read_header(int fildes);
+hdr* write_header(int out_fildes,char* filename);
 
 hdr* read_header(int fildes){
 	hdr* file_hdr;
@@ -64,7 +72,7 @@ hdr* read_header(int fildes){
 			break;
 		}
 	}
-	timestamp = (int)strtol(buf_timestamp,(char**)NULL,12);
+	timestamp = (int)strtol(buf_timestamp,(char**)NULL,10);
 	file_hdr->timestamp = timestamp;
 
 	/* Read the file's owner ID */
@@ -110,11 +118,90 @@ hdr* read_header(int fildes){
     		break;
     	}
 	}
-	size = (int)strtol(buf_size, (char**)NULL, 10);
+	size = (int)strtol(buf_size, (char**)NULL, 10);//dump non-digit part
 	file_hdr->size = size; // parse the size char[] into int 
 	//printf("identifier is %s, size is %d, bits is %d",file_hdr->identifier,file_hdr->size,file_hdr->bits);
 	return file_hdr;
 
+}
+
+hdr* write_header(int out_fildes, char* filename)
+{
+	hdr* file_hdr;
+	struct stat file_stat;
+	char buf_header[60];
+	int bits;
+	int size;
+	int mode;
+	time_t timestamp;
+	int uid;
+	int gid;
+	char buf_size[10]; // at most 10 bits for size
+	char buf_mode[8]; // at most 8 bits for mode
+	char buf_uid[6]; // at most 6 bits for owner id
+	char buf_gid[6]; // at most 6 bits for group ids
+	char buf_timestamp[12]; // at most 12 bits for timestamp
+	int errnum;
+
+	file_hdr = (hdr*) malloc(sizeof(hdr));
+	if(stat(filename,&file_stat)==-1){
+		errnum = errno;
+		fprintf(stderr, "Error opening file: %s\n", strerror(errnum));
+		exit(0);
+	}
+
+	sprintf(file_hdr->identifier, "%-16s", filename);
+    file_hdr->identifier[strlen(filename)] = '/';
+
+    sprintf(buf_timestamp, "%-12d", (int)file_stat.st_mtime);
+    timestamp = (int)strtol(buf_timestamp,(char**)NULL,10);
+    file_hdr->timestamp = timestamp;
+
+    sprintf(buf_uid, "%-6d", (int)file_stat.st_uid);
+    uid = (int)strtol(buf_uid,(char**)NULL,10);
+    file_hdr->uid = uid;
+
+    sprintf(buf_gid, "%-6d", (int)file_stat.st_gid);
+    gid = (int)strtol(buf_gid,(char**)NULL,10);
+    file_hdr->gid = gid;
+
+    sprintf(buf_mode, "%-8o", file_stat.st_mode);//stored as octal
+    mode = (int)strtol(buf_mode,(char**)NULL,10);
+    file_hdr->mode = mode;
+
+    sprintf(buf_size, "%-10d", (int)file_stat.st_size);
+    size = (int)strtol(buf_size,(char**)NULL,10);
+    file_hdr->size = size;
+
+    if(out_fildes!=-1){
+    	write(out_fildes, file_hdr->identifier, 16);
+	    write(out_fildes, buf_timestamp, 12);
+	    write(out_fildes, buf_uid, 6);
+	    write(out_fildes, buf_gid, 6);
+	    write(out_fildes, buf_mode, 8);
+	    write(out_fildes, buf_size, 10);
+	    write(out_fildes, ar_end_char, 2); //end char
+
+    }
+    
+    return file_hdr;
+
+}
+int write_data(int in_fildes, int out_fildes, hdr* file_hdr)
+{
+	char buf[1];
+    int counter =0;
+	while (counter < file_hdr->size) {
+        read(in_fildes, buf, 1);
+        write(out_fildes, buf, 1);
+        counter+=1;
+    }
+    if (file_hdr->size%2 != 0){ //append extra '/n' for odd size
+        write(out_fildes, new_line, 1);
+    }
+    close(out_fildes);
+    close(in_fildes);
+    return 1;
 }
 void print_mode(int mode)
 {
@@ -140,17 +227,22 @@ void print_time(time_t timestamp)
                              timestruct.tm_min, timestruct.tm_year+1900);
 
 }
-int is_archive(char* identifier)
+int is_archive(int fildes)
 {
 	char arch_magic[8];
+	char buf_magic[8];
+	if (fildes == -1) {
+	    return 0; //file doesn't exist
+    }
+	read(fildes,buf_magic,8);
 	for (int i=0;i<7;i++){
-		arch_magic[i] = identifier[i];
+		arch_magic[i] = buf_magic[i];
 	}
 	if(strcmp(arch_magic,"!<arch>")==0){//examine against the archive identifier
-		return 1;
+		return 1; //open archive file successuly
 	}
 
-	return 0;
+	return -1; //file format is not archive
 }
 
 int t_method(int fildes)
@@ -215,9 +307,17 @@ int v_method(int fildes)
 }
 
 
-int q_method(char* aname, char* name)
+int q_method(char* archive_name, char* file_name)
 {
-	printf("q_method is called with file name %s\n",name);
+    int in_fildes;
+    int out_fildes;
+
+    out_fildes = open(archive_name, O_WRONLY | O_APPEND);
+    in_fildes = open(file_name, O_RDONLY);
+    hdr* file_hdr = write_header(out_fildes,file_name); //create_header for file
+    write_data(in_fildes,out_fildes,file_hdr);
+
+    return 1;
 }
 
 int x_method(char* aname, char* name)
@@ -242,20 +342,14 @@ int main(int argc, char **argv)
 {
 	char* name;
 	int key;
+	int errono; //return value from is_archive
+	int out_fildes;//use to create file
+
 	char *aname = argv[2];
-	char identifier[8];
 	int fildes = open(aname, O_RDONLY);
 
-	if (fildes == -1) {
-	    printf("File %s doesn't exist.\n",aname);
-	    exit(0);
-    }
-	read(fildes,identifier,8);
-	if(is_archive(identifier)==0){
-		printf("File not valid ...\n");
-		exit(0);
-	}
 
+	errono = is_archive(fildes);
 	if(argc == 4){
 	  name = argv[3];
 	}
@@ -271,9 +365,17 @@ int main(int argc, char **argv)
     while ((key = getopt(argc, argv, "qxtvdA")) != -1){ //checking EOF
     	switch (key) {
             case 'q':
-                q_method(aname,name); break;
+            	if (errono == 0){
+            		/*Archive file doesn't exist, create one*/
+            		out_fildes = open(aname, O_WRONLY | O_CREAT, 0666);
+        			write(out_fildes, "!<arch>\n", 8);
+        			close(out_fildes);
+            	}
+                q_method(aname,name); 
+                break;
             case 'x':
-            	x_method(aname,name); break;
+            	x_method(aname,name); 
+            	break;
             case 't':
                 t_method(fildes); 
                 break;
@@ -281,9 +383,11 @@ int main(int argc, char **argv)
             	v_method(fildes); 
             	break;
             case 'd':
-                d_method(aname,name); break;
+                d_method(aname,name);
+                 break;
             case 'A':
-            	A_method(aname); break;
+            	A_method(aname); 
+            	break;
             default:
                 printf("Usage: %s [-qxtvdA] [afile...] [file...]\n", argv[0]);
                 exit(0);
