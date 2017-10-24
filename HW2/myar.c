@@ -51,17 +51,17 @@ hdr* read_header(int fildes){ // read next header, no lseek size
 	int uid;
 	int gid;
 	char buf_size[10]; // at most 10 bits for size
-	char buf_mode[8]; // at most 8 bits for mode
-	char buf_uid[6]; // at most 6 bits for owner id
-	char buf_gid[6]; // at most 6 bits for group ids
-	char buf_timestamp[12]; // at most 12 bits for timestamp
+	char buf_mode[9]; // at most 8 bits for mode
+	char buf_uid[7]; // at most 6 bits for owner id
+	char buf_gid[7]; // at most 6 bits for group ids
+	char buf_timestamp[13]; // at most 12 bits for timestamp
 
 	file_hdr = (hdr*) malloc(sizeof(hdr));
 	bits = read(fildes,buf_header,60);
 	file_hdr->bits = bits;
 
 	/* Read the file identifier */
-	for (int i=0;i<15;i++){
+	for (int i=0;i<15;++i){
 		file_hdr->identifier[i] = buf_header[i];
 		if(file_hdr->identifier[i]=='/'){
 			file_hdr->identifier[i] = '\0';
@@ -70,7 +70,7 @@ hdr* read_header(int fildes){ // read next header, no lseek size
 	}
 
 	/* Read the file's timestamp */
-	for(int i=16;i<28;i++){
+	for(int i=16;i<28;++i){
 		buf_timestamp[i-16]=buf_header[i];
 		if(buf_timestamp[i-16] == ' '){
 			buf_timestamp[i-16] = '\0';
@@ -81,7 +81,7 @@ hdr* read_header(int fildes){ // read next header, no lseek size
 	file_hdr->timestamp = timestamp;
 
 	/* Read the file's owner ID */
-	for(int i=28;i<34;i++){
+	for(int i=28;i<34;++i){
 		buf_uid[i-28]=buf_header[i];
 		if(buf_uid[i-28] == ' '){
 			buf_uid[i-28] = '\0';
@@ -94,7 +94,7 @@ hdr* read_header(int fildes){ // read next header, no lseek size
 	
 
 	/* Read the file's group ID */
-	for(int i=34;i<40;i++){
+	for(int i=34;i<40;++i){
 		buf_gid[i-34]=buf_header[i];
 		if(buf_gid[i-34] == ' '){
 			buf_gid[i-34] = '\0';
@@ -105,7 +105,7 @@ hdr* read_header(int fildes){ // read next header, no lseek size
 	file_hdr->gid = gid;
 
 	/*Read the file mode*/
-	for (int i=40;i<48;i++){
+	for (int i=40;i<48;++i){
 		buf_mode[i-40]=buf_header[i];
 		if(buf_mode[i-40] == ' '){
 			buf_mode[i-40] = '\0';
@@ -116,7 +116,7 @@ hdr* read_header(int fildes){ // read next header, no lseek size
 	file_hdr->mode = mode; // parse the mode char[] into int 
 
 	/* Read the file size */
-	for (int i=48;i<58;i++){
+	for (int i=48;i<58;++i){
 		buf_size[i-48]=buf_header[i];
 		if(buf_size[i-48] == ' '){
     		buf_size[i-48] = '\0';
@@ -238,7 +238,6 @@ int extract(int in_fildes, int out_fildes, int offset)
 {
 	struct utimbuf file_time;
 	hdr* file_hdr;
-    int counter = 0;
     int* buf_size; 
     int* buf_header;
     char buf[1];
@@ -254,24 +253,27 @@ int extract(int in_fildes, int out_fildes, int offset)
     buf_size = malloc(sizeof(file_hdr->size));// reserve buffer for header of file
 
     lseek(in_fildes, offset, SEEK_SET); // move pointer to file data
-    file_hdr = read_header(in_fildes);
+    file_hdr = read_header(in_fildes); // read in header
+
     mode = file_hdr->mode;
+
     timestamp = file_hdr->timestamp;
-    file_time.actime = timestamp; 
+    //file_time.actime = timestamp; 
     file_time.modtime = timestamp;
+    time(&file_time.actime);
+
     filename = file_hdr->identifier;
 
-    //Extract to new file
-    while (counter < file_hdr->size) {
-        read(in_fildes, buf, 1);
+    //extract data up to file size back to file
+    for (int i=0;i<file_hdr->size;i++){
+    	read(in_fildes, buf, 1);
         write(out_fildes,buf,1);
-        counter+=1;
     }
 
-    fchmod(out_fildes, mode);
-    utime(filename, &file_time);
+    fchmod(out_fildes, mode);//restore file permission
+    utime(filename, &file_time);//restore file mtime and atime
 
-    //Clean up
+    //Free buffer
     close(out_fildes);
     close(in_fildes);
     free(buf_size);
@@ -333,11 +335,11 @@ int t_method(int fildes)
         	file_size += 1;
     	}
     	lseek(fildes, file_size, SEEK_CUR);
-    	file_hdr = read_header(fildes);
     	if(strcmp(file_hdr->identifier,"\n")==0){
     		break;
     	}
     	printf("%s\n",file_hdr->identifier);
+    	file_hdr = read_header(fildes);
 	}
 	return 1;
 	
