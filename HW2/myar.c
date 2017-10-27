@@ -1,3 +1,6 @@
+/*
+	This code is my own code without consulting any students or TA. Runye Wang 2166594
+*/
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -10,6 +13,7 @@
 #include <utime.h>
 #include <errno.h>
 #include <string.h>
+#include <dirent.h> 
 
 extern int errno ;
 
@@ -26,6 +30,7 @@ typedef struct _hdr { // ar header data structure to store file infomration
 char *ar_identifier = {"!<arch>"};
 char ar_end_char[3] = {0x60, 0x0A, 0x00};
 char new_line[2] = {0x0A,0x00};
+double TWO_HOUR = 2*60*60;
 
 void print_mode(int mode);
 void print_time(time_t timestamp);
@@ -37,6 +42,7 @@ int t_method(int fildes);
 int v_method(int fildes);
 int q_method(char* filename, char* aname);
 int x_method(int fildes, char* filename, char* aname);
+int A_method(int fildes, char*aname);
 hdr* read_header(int fildes);
 hdr* write_header(int out_fildes,char* filename);
 
@@ -299,10 +305,10 @@ void print_time(time_t timestamp)
 	
 	struct tm timestruct;
     char months[12][4] = {"Jan\0", "Feb\0", "Mar\0", "Apr\0", "May\0", "Jun\0",
-                          "Jul\0", "Aug\0", "Sep\0", "Oct\0", "Nov\0", "Dec\0"};
+                          "Jul\0", "Aug\0", "Sep\0", "Oct\0", "Nov\0", "Dec\0"};//Use array of arrays to get verbal month
     timestruct = *localtime(&timestamp);
     printf("%s %d %02d:%02d %d", months[timestruct.tm_mon], timestruct.tm_mday, timestruct.tm_hour,
-                             timestruct.tm_min, timestruct.tm_year+1900);
+                             timestruct.tm_min, timestruct.tm_year+1900);//format timestamp
 
 }
 int is_archive(int fildes)
@@ -422,9 +428,36 @@ int d_method(char* aname, char* name)
 	printf("d_method is called with file name %s\n",name);
 }
 
-int A_method(char* aname)
+int A_method(int fildes, char* aname)
 {
-	printf("A_method is called");
+	DIR* dp;
+	struct dirent* current_dir;
+	struct stat file_stat;
+	time_t current = time(NULL);
+	time_t file_time;
+	double time_diff;
+
+	printf ("Current local time and date: %s",ctime(&current));
+
+	dp = opendir(".");
+	while((current_dir = readdir(dp))!=NULL){
+		
+		if(strcmp(current_dir->d_name,".")!=0 && strcmp(current_dir->d_name,"..")!=0
+											  && strcmp(current_dir->d_name,aname)){
+			printf("%s ",current_dir->d_name);
+
+			stat(current_dir->d_name, &file_stat);
+			file_time = file_stat.st_mtime;
+    		printf("Last modified time: %s", ctime(&file_time));
+    		time_diff = difftime(file_time,current);
+    		if(time_diff <= TWO_HOUR){
+    			printf("Append\n");
+    			q_method(aname,current_dir->d_name);
+    		}
+		}
+	}
+
+	closedir(dp);
 }
 
 int main(int argc, char **argv)
@@ -437,9 +470,12 @@ int main(int argc, char **argv)
 	char *aname = argv[2];
 	int fildes = open(aname, O_RDONLY);
 
-
 	exist = is_archive(fildes);
-	if(argc == 4){
+	if(argv[1][0]!='-'){
+		printf("Usage: %s [-qxtvdA] [afile...] [file...]\n", argv[0]);
+		exit(0);
+	}
+	if(argc >= 4){
 	  name = argv[3];
 	}
 	 /* Options:
@@ -461,6 +497,11 @@ int main(int argc, char **argv)
         			close(out_fildes);
             	}
                 q_method(aname,name); 
+                int i=4;
+            	while(argv[i]!=NULL){
+            		q_method(aname,argv[i]);
+            		i++;
+            	}
                 break;
             case 'x':
             	if (exist ==0){
@@ -479,7 +520,7 @@ int main(int argc, char **argv)
                 d_method(aname,name);
                  break;
             case 'A':
-            	A_method(aname); 
+            	A_method(fildes,aname); 
             	break;
             default:
                 printf("Usage: %s [-qxtvdA] [afile...] [file...]\n", argv[0]);
