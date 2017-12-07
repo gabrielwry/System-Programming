@@ -1,6 +1,6 @@
 
 # System Programming Fall 2017 Midterm
-##True and Flase
+## True and Flase
 
 | No.| Answer|        Explanation     |
 |  :- |:--:  | :------------------------------------|
