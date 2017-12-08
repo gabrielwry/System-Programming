@@ -329,11 +329,33 @@ was free to use the local memory with the semaphore unlocked.
 		zero.
  - Signal: a notification that an event has occurred, it's life cycle is that when the event it's associated occurs and generates it until it is delivered and the action has been taken. 
 	 - 3 possible actions are: SIG_DFL for default, SIG_IGN for ignore, and user specified action, which is process-wide; 
+		- `sigaction`: set signal action with struct `sigaction`, that can have SIG_DFL, SIG_IGN or a function pointer
+		- `kill killpg pthread_kill abort riase`  to generate signalst to pid:
+			- >0 whosse process is pid
+			- 0 whose procexx group is the same as the sending-process
+			- < -1 process-group id is absolute of pid
+			- -1 all processes of sender has permission
+		- effect of `fork pthread_create exec` on signal:
+			1. Signal actions: After a fork, the child inherits all signal actions. After an
+exec, signals set to SIG_DFL remain that way; signals set to SIG_IGN
+remain that way, except for SIGCHLD, which may be set to SIG_IGN or
+SIG_DFL, as the implementation chooses; caught signals are set to SIG_DFL.
+As all actions are process-wide, pthread_create has no effect.
+			2. Signal mask: Inherited from the forking thread after a fork; stays the same
+			as the execing thread after an exec; copied to the new thread from the creating
+			thread after a pthread_create.
+			3. Pending signals: Cleared after a fork; same as the execing thread after an
+			exec; cleared after a pthread_create.
+
 	 - A signal mask is a collection of all pending/ blocking signals of this process
 		- Managing: `sigempset sigfillset sigaddset sigdelset sigismember` to test, set, or clear a sigmask bit. Start with `sigempset `or `sigfillset` and do other operation on the mask
-		- Set: there is only one sigmask at a time for one thread and it can be set by using `pthread_sigmask`, taking parameters `set` and `how`
+		- Set: there is only one sigmask at a time for one thread and it can be set by using `pthread_sigmask`, taking parameters `set` and `how`. SIG_BLOCK add the set, SIG_UNBLOCK remove the set, and SIG_SET set the mask to set; SIGKILL and SIGSTOP can not be blocked. If only one thread for a process, can use `sigprocmask` that use errno instead of returning error code.
 	 - The delivery of a nonignored signal will cause the system call to be interrupted, if the action was to terminate, the interrupted system call is never resumed, if it is to stop the process, it will pick it up whenever it is left. only system calls that blocks -- waiting for unpredictable result can be interrupted.
 	 - Deprecated Signal System Call
+		 - classic way to set sigaction `signal`: new action parameter looks like : `void (*act)(int)`, could be a pointer to a function taking an integer argument
+		 - Upon delivery, the sigaction is reset to SIG_DFT, need to call `signal` again
+		 - The delivered signal is not blocked, so the second arrival may terminate the process
+	 - Global Jumps: normally a  function returns by executing return statement but can be redirected by jmp:
+		 - `setjmp` with jmp_buf that hold a saved location info, return 0 if called directlym or return val set by long jmp
 		 - 
-	 - Global Jumps
 	 - Clocks and Timers
