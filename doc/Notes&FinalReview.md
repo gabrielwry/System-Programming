@@ -280,9 +280,53 @@ This write up will summarize and categorize important knowledge about system pro
 		 - exist only within a single machine, can not communicate through network
 		 - life time is the same as kernel
 		 - access through an integer key that is invariant for the whole life time , any process know this key can open the object
- - System V Message Queue
- - Semaphores:
+	 - use system calls : (msg, sem, shm) + (get, ctl); also msgsnd, msgrcv and semop shmat, smdt.
+	 - `ftok`can generate keys from pathname, specified by the id parameter; two different paths in the same file system will generate different keys
+	 - Ownership and Permission: use the struct `ipc_perm` for permission that specify owner and creator user and group ID
+	 - utilities in command line: use ipcs for displaying info, ipcrm to remove specified object
+ - System V Message Queue:
+	 - System calls:
+		 - `msgget`:IPC_CREAT and IPC_EXCL to set flags for creating or failing if exists. A key IPC_PRIVATE will guarantee a unique key
+		 - `msgctl`: take the struct msqid_ds to control the existing queue (IPC_RMID to remove, IPC_STAT to get info IPC_SET to set id, mode and permission.
+		 - `msgsnd` and `msgrcv`: with a struct `msg` that can be user-defined, and a type parameter:
+			 - = 0: receive the first message, regardless type
+			 - > 0 : receive first message of specified type
+			 - < 0: get first message with type lower or equal the absolute value of type
+			 - if don't care, use 1 when send, and 0 when receive
+			 - `msgsize` always set to `sizeof(msg.data)`
+	
+	 - Limits: There are limits on the number of message, size of total message in a queue, and size of message, total number of queues in a system
+ - Semaphores: used as a counter to prevent two or more processes from accessing the shared resource at the same time
+	 - use `semwait` to decrease counter and `sempost` to increase won't work well:
+		 - the semaphore may not be shared by processes
+		 - if kernel interrupt it, tt is not executed atomically
+			 - will cause inefficient CPU use if `semwait` wait on counter 0
+	 - System V semaphore: 
+		 - `semget`get semaphore identifier but doesn't initialize it, use `semctl` to set the counter
+		 - Process or thread creates the semaphore also calls semctl to initialize it, and then use `sem_op` to set the sem_otime which is initialized as 0, so other process will wait until the sem_otime becomes non-zero (so they know it is initialized)
+	 - `semop`: operate on semaphore with struct `sembuf`, 
+		 - each `sem_op` in `sembuf` can be positive, zero, or negative:
+			 - >0 increment semaphore value 
+			 - <0 decrease semaphore value
+			 - 0 block until value get to 0
+
+		 - all `semop` operation is atomic, and function doesn't return until everything is done, blocking can be prevented with IPC_NOWAIT flag
+		 - adjustment is stored for any increments or decrements, so op can be undone with IPC_UNDO flag
  - Share Memory:
+	 - System V shared memory:
+		 - `shmget shmctl shmat shmdt`: used to get attach detach and control the shared memory, `shmget` will get you the identifier and is used in `shmctl`, but `shmat` gives you the pointer which should be passed to `shmdt`
+		 - Shared memory and Semaphore: You can not share memory between two processes without some form of semaphore control, can not assume the pointer is atomic. Procedures:
+		  - The child assigned *p to local memory with the semaphore locked and then
+was free to use the local memory with the semaphore unlocked.
+			- Similarly, the parent used a local variable in the for loop, locking the semaphore
+			only to access the shared memory.
+			- Initially, the semaphore is locked (zero value), so the parent is free to initialize
+			the shared memory to zero. Then it calls SimpleSemPost to get things
+			moving. It’s OK if the child accesses the shared memory at that point. This
+			version then can be run repeatedly since it initializes the segment each time
+			it’s run.
+			- We remove the semaphore at the start of each run so that it will start with
+		zero.
  - Signal:
 	 - Deprecated Signal System Call
 	 - Global Jumps
