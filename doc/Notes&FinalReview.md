@@ -356,6 +356,9 @@ As all actions are process-wide, pthread_create has no effect.
 		 - Upon delivery, the sigaction is reset to SIG_DFT, need to call `signal` again
 		 - The delivered signal is not blocked, so the second arrival may terminate the process
 	 - Global Jumps: normally a  function returns by executing return statement but can be redirected by jmp:
-		 - `setjmp` with jmp_buf that hold a saved location info, return 0 if called directlym or return val set by long jmp
-		 - 
+		 - `setjmp` with jmp_buf that hold a saved location info, return 0 if called directlym or return val set by long jmp. First, setjmp location with location info you need, and no matter how deep nested you are in a function, use `longjmp` to jum to arbitrary location
+		 - To force sigmask beign restored, use `sigsetjmp` and `siglongjmp`, the sigmask restored is the one that is called when `sigsetjmp`
+		 - force the sigmask to be reset, use `_setjmp` and `_longjmp`
 	 - Clocks and Timers
+		 - `alarm`: every process has one alarm set for the system call, and SIGALARM is sent when the alarm goes off, a child inherits its parent's alarm clock but the actual clock is not shared. The system call `alaram()` set the second given by sec and return the old value, if sec is 0 the alarm is turned off (eg: call a read, and set an alarm for 5 secs, if the read is longer than 5 sec, it will be blocked, but if it is shorter, remember to turn off the alarm, or it will block something else)
+		 - `sleep`: blocks a thread for specific time
