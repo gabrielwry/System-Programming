@@ -14,7 +14,7 @@ This write up will summarize and categorize important knowledge about system pro
 
 ## Content:
 - [C and UNIX](#c-and-unix)
-- [File I/O](#file-IO)
+- [File I/O](#file-io)
 - [Process and Threads](#process-and-threads)
 - [Interprocess Comunication](#interprocess-communication)
 
@@ -24,7 +24,7 @@ This write up will summarize and categorize important knowledge about system pro
 - [uniqify and sort words from `stdin`](https://github.com/gabrielwry/System-Programming/tree/master/HW3)
 - [Interprocess communication programs to compute perfect numbers](https://github.com/gabrielwry/System-Programming/tree/master/HW4)
 
-###<span name = "c-and-unix"> C and Unix</span>
+### <span name = "c-and-unix"> C and Unix</span>
  - UNIX versions and standards:
 	- UNIX was first developed as a research project in AT&T Bell Lab
 	- Licenses of UNIX make their own modification. **BSD**, developed by Berkeley University supports **sockets** and **virtual memory.**
@@ -69,7 +69,7 @@ This write up will summarize and categorize important knowledge about system pro
 
 
 
-##File I/O
+### <span name = "file-io">File I/O</span>
  - File types:
 	 - Ordinary File: segment of bytes
 		 - The structure of a disk:
@@ -124,6 +124,13 @@ This write up will summarize and categorize important knowledge about system pro
 			- For exclusive access to resource: try open a file with O_EXCL when trying to access resources, only one process will succeed, when that one process finished, it will unlink the file and other process can succeed on access theh resource. 
 
  - `Unmask` and `unlink` 
+	 - `unmask()` is used to change the permission group 9-bit, it will return the old mask
+	 - `unlink()` reduces the link number in i-node by one, if the count reach 0, the file system will discard the file. 
+		 - Note: if a process that has this file open is not closed yet, the actual file data will remain on the disk but the file name will be removed once the count reached 0.
+		 - Any kind of file can be unlinked,  but only superuser can unlink a dir, always use rmdir a directory. 
+
+ - Temporary Files:
+	 - 
 
  
 
