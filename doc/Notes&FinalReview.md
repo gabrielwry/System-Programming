@@ -21,7 +21,7 @@ This write up will summarize and categorize important knowledge about system pro
 ## Codes:
 - [Goldbach test with Sieve Method](https://github.com/gabrielwry/System-Programming/tree/master/HW1)
 - [Archive program to do similar `ar` as system call](https://github.com/gabrielwry/System-Programming/tree/master/HW2)
-- [uniqify and sort words from `stdin`](https://github.com/gabrielwry/System-Programming/tree/master/HW3)
+- [Uniqify and sort words from `stdin`](https://github.com/gabrielwry/System-Programming/tree/master/HW3)
 - [Interprocess communication programs to compute perfect numbers](https://github.com/gabrielwry/System-Programming/tree/master/HW4)
 
 ### <span name = "c-and-unix"> C and Unix</span>
@@ -260,3 +260,24 @@ This write up will summarize and categorize important knowledge about system pro
 
  ###  <span name = "interprocess-communication"> Interprocess Communication</span>
  
+
+ - Pipe: unnamed Pipe
+	 - create: `pipe` system call, returns an array of 2 file descriptor, representing a communication channel, writing to pfd[1] to put data in pipe, and read from pfd[0] to get it out; use `pipebuf` when multiple processes are writing to the same pipe, so that data written is atomic (if bytes smaller or equal to buf size);
+	 - Pipe behavior:
+		 - `write`: data written to a pipe is sequenced in order of arrival, and `write` will block if not enough room until enough data was removed by `read`. There is no partial write. If amount is larger than PIPE_BUF, partial write is possible. 
+		 - `read` : data read from pipe is in order of arrival, and can not be reread or put back. `read` will block if there is no data for reading, or return 0 if all `write` ends are closed, byte count is the most byte can be read at once .
+		 - `close` : if frees up the file descriptor for reuse, and if all writing end are closed, reader will reach EOF. If all reading ends closed, `write` returns an error.
+		 -  `fstat` and `lseek` are not useful
+		 - `dup` and `dup2` : duplicate a new file descriptor that points to the same file and shared the same file description, `dup2` can specify which fd to use, and will close it if necessary. 
+	
+
+	 - General Guidance: create a pipe -> fork the reading child -> close the writing end and do other preparation in child process -> execute the child program in child process -> close the reading end in parent process -> if using a second child to write, create it and make preparation, if parent is writing, just write.
+ - FIFO or Named Pipe
+ - System V IPC
+ - System V Message Queue
+ - Semaphores:
+ - Share Memory:
+ - Signal:
+	 - Deprecated Signal System Call
+	 - Global Jumps
+	 - Clocks and Timers
