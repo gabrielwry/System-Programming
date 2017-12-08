@@ -327,7 +327,13 @@ was free to use the local memory with the semaphore unlocked.
 			it’s run.
 			- We remove the semaphore at the start of each run so that it will start with
 		zero.
- - Signal:
+ - Signal: a notification that an event has occurred, it's life cycle is that when the event it's associated occurs and generates it until it is delivered and the action has been taken. 
+	 - 3 possible actions are: SIG_DFL for default, SIG_IGN for ignore, and user specified action, which is process-wide; 
+	 - A signal mask is a collection of all pending/ blocking signals of this process
+		- Managing: `sigempset sigfillset sigaddset sigdelset sigismember` to test, set, or clear a sigmask bit. Start with `sigempset `or `sigfillset` and do other operation on the mask
+		- Set: there is only one sigmask at a time for one thread and it can be set by using `pthread_sigmask`, taking parameters `set` and `how`
+	 - The delivery of a nonignored signal will cause the system call to be interrupted, if the action was to terminate, the interrupted system call is never resumed, if it is to stop the process, it will pick it up whenever it is left. only system calls that blocks -- waiting for unpredictable result can be interrupted.
 	 - Deprecated Signal System Call
+		 - 
 	 - Global Jumps
 	 - Clocks and Timers
