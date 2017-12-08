@@ -129,8 +129,33 @@ This write up will summarize and categorize important knowledge about system pro
 		 - Note: if a process that has this file open is not closed yet, the actual file data will remain on the disk but the file name will be removed once the count reached 0.
 		 - Any kind of file can be unlinked,  but only superuser can unlink a dir, always use rmdir a directory. 
 
- - Temporary Files:
-	 - 
+ - Temporary Files: mkstemp guarantees to create a file with unique name, need to arrange `unlink()`
+
+ - File offset and O_APPEND:
+	 - A file offset is a position in regular file where next `read` or `write` will occur
+	 - Independent offset each time a file is opened, as the file description is unique.
+	 - Without the O_APPEND, the offset starts at zero, and unless specified, the `read` and `write` are sequential. 
+	 - O_APPEND will prevent from overwriting data, good for logging (setting offset of write to EOF automatically)
+
+ - `write()`:
+	 - writes nbyte to the current position pointed by offset, and increment the offset by the number of bytes written;
+	 - `write()` doesn't really write data to the disk, it actually first transfers data to a buffer and then return; If UNIX crashes: 
+		 - real data won't be written on disk
+		 - process won't be notified about the error, partial write won't trigger the errno
+		 - the order of the physical write can not be controlled
+
+ - `read()`: read n-bytes from the current position specified by the offset, won't be affected by the O_APPEND, partial read won't trigger the errno.
+ - `close()` only mark the file descriptor as reusable, when the last file descriptor pointed to a open file description is closed, the open file description closed as well ( the file description keeps the count of the file descriptors pointed to it, so it knows when the last one was deleted), then if the last file description pointed to an in memory i node is closed, the in memory i node is closed. Doesn't have to `close` actually, it will automatically close once the process terminated. 
+ - User Buffering:  Not really much to say, BUFIO will accelerate the provess. 
+
+ - `lseek()`: set the file offset, return the result offset
+	 - whence:  SEEK_SET -> set to pos,  SEEK_CUR -> set to current + pos (can be positive, 0, or negative), SEEK_END -> set to file size + pos
+	 - resulting offset must be non-negative
+
+ - `pread() pwrite()`: it is the `read` and `write` ignoring the offset, don use and don't set . 
+	 - will solve the problem of another process changing the offset between `lseek()` and `read, write`
+
+ - `readv() writev()`:
 
  
 
