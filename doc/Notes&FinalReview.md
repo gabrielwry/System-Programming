@@ -272,8 +272,14 @@ This write up will summarize and categorize important knowledge about system pro
 	
 
 	 - General Guidance: create a pipe -> fork the reading child -> close the writing end and do other preparation in child process -> execute the child program in child process -> close the reading end in parent process -> if using a second child to write, create it and make preparation, if parent is writing, just write.
- - FIFO or Named Pipe
- - System V IPC
+ - FIFO or Named Pipe: FIFO combines regular files and pipes, it has name and can be opened by any process with the right permission, so unrelated process can communicate over a FIFO. Always opened for reading and waiting for a different process to open it for writing, once created, it follows the same pipe behavior, vice versa. O_NONBLOCK flag can be used read will succeed and write will fail if no reader is opened, this prevent putting data in the FIFO 
+	 - create: `mkfifo`: the PERM is used to set the new file permission, once it is created, it behaves like a pipe. Mostly useful to pass data between server and client. 
+	 - critique: single FIFO can not have multiple read ends, data has to be copied back and forth causing too many system calls;
+ - System V IPC: older set of semaphores, message queue and shared memory, newer is POSIX IPC
+	 - These three objects are not files, but mechanism with unique naming. Principles:
+		 - exist only within a single machine, can not communicate through network
+		 - life time is the same as kernel
+		 - access through an integer key that is invariant for the whole life time , any process know this key can open the object
  - System V Message Queue
  - Semaphores:
  - Share Memory:
