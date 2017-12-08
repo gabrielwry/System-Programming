@@ -237,9 +237,26 @@ This write up will summarize and categorize important knowledge about system pro
 	 - _exit and _Exit one is from UNIX, the other from standard C
 	 - `exit()` a higher level than `_exit` as it does some sort of clean up, call function registered atexit, and do a flush of I/O buffer.
 	 - usually call `_exit` in a child process that hasn't done an `exec`
-	 - upon termination: all file 
+	 - upon termination: all open file descriptors are closed, all child processes now have a special system process as parent
 
  - `wait(),waitpid(),waitid()`: waits for a child process
+	 - `waitpid()`: 
+		 - pid  argument:
+			 - > 0: wait for the specific child process with pid
+			 - -1: wait for any child process
+			 - 0: wait for any child process in the same process group as the calling process
+			 - < -1: wait for any child process in the process group whose process-group id is -pid
+		 - only direct child created by `fork()` can be waited for, normally a process should wait for every child it created, or the terminated child process may exist in system as zombie until parents terminated
+		 - a child changes status is waitable, can cause at most one return from waitpid
+	
+
+	 - `wait()` is a short hand for `waitpid` with pid = -1
+	 
+	 - `waitid()` get the status of a process back and keep it waitable
+
+ - Setting User and Group IDs and Process IDs: Kernel keeps the saved id that were set by last `exec()`, no ordinary process can explicitly change real user ID or saved ID, except `exec` can change saved id; ordinary process can change effective ID to real or saved ID, superuser can change real and effective ID to any value, saved ID changes with the real ID if a superuser changes it. 
+	 - use `seteuid, setegid` superuser can also use `setuid, setgid`
+	 - `getpid()` and `getppid()` can get process ID or process ID of parent.
 
  ###  <span name = "interprocess-communication"> Interprocess Communication</span>
  
