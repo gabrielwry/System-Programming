@@ -7,7 +7,7 @@
 | No.| Answer|        Explanation     |
 |  :- |:--:  | :------------------------------------|
 |  1  | F    | The implementation of a standard libc depends on version of Operating System. Refer to book **1.3 System Call** .|
-|  2  |   F  | `fputc()` writes a character to the stream indicated by the stream pointer each time, and move the pointer forward, it is expensive as moving the pointer is a system call. Refer to [IBM PAGE](https://www.ibm.com/support/knowledgecenter/en/ssw_ibm_i_72/rtref/fputc.htm) and book **Session 2.12**.                |
+|  2  |   F  | `fputc()` read from user buffer so it saved from extensive system call, but the cache is not from U-BLOCK which only stored system info.  Refer to [IBM PAGE](https://www.ibm.com/support/knowledgecenter/en/ssw_ibm_i_72/rtref/fputc.htm) and book **Session 2.12**.                |
 |  3  |   T  | `getc()` outperform `fgetc()` as doesn't have to do a system call (moving the pointer) to access the stream each time reading a char. And it comes in a macro form. Refer to [IBM Page](https://www.ibm.com/support/knowledgecenter/en/SSLTBW_2.3.0/com.ibm.zos.v2r3.bpxbd00/getc.htm) .                 |
 |  4  | F    | I am not sure about this one. But, environment variables are stored in a file before a process runs, and it then is  passed to the program and exists on the DATA segment. Refer to [ArchWiki](https://wiki.archlinux.org/index.php/environment_variables) .  |
 |  5  |   F   | ELF header doesn't have those sizes. DATA TEXT and SEGMENT are for processes, they were established when the process runs. Refer to  [Stack Overflow](https://stackoverflow.com/questions/6270945/linux-stack-sizes) .           |
@@ -20,7 +20,7 @@
 |  12  |    T  | By definition, a super block is a record of the characteristics of the file system . Refer to [this page](http://www.linfo.org/superblock) or book **Session 3.2.2**.                |
 |  13  |   F   | the & bit operation will actually test the ith bit.|
 |  14  | F    | The child process created by `fork()` will have to inherit environment variables. Refer to book **Session 5.5**|
-|  15  |    64  | Each indirect block stores 8K i-nodes which store 8K data. 8000*8000 = 64,000,000|
+|  15  |    16  | Each indirect block stores 8K/4= 2K i-nodes which store 8K data. 2000*8000 = 16,000,000|
 |  16  |   F  | break 100 will actually stop the process at line 100, but the debugger is still running.|
 |  17  |   T | File descriptor will stay open after an `exec()`, need to call `close()` if want to close it. Refer to Book **Page287** |
 |  18  |    F  | C doesn't have garbage system, space reserved by `mallloc()` will be marked as reusable eventually|
